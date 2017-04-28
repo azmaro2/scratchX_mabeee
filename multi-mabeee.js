@@ -3,17 +3,24 @@ var MaBeee = function(id, name) {
     this.name = name;
 };
 MaBeee.prototype = {
-    setId : function(id) { this.id = id; },
-    setName : function(name) { this.name = name; },
-    getId : function() { return this.id; },
-    getName : function() { return this.name; }
+    setId: function(id) {
+        this.id = id;
+    },
+    setName: function(name) {
+        this.name = name;
+    },
+    getId: function() {
+        return this.id;
+    },
+    getName: function() {
+        return this.name;
+    }
 };
 
 
 (function(ext) {
 
-    var mabeees = [];
-    var mabeee = new MaBeee(1, "scratch");
+    var mabeee = new MaBeee(1, "_default");
 
     ext._shutdown = function() {
         requestMaBeeeAction('devices/' + mabeee.getId() + '/disconnect');
@@ -21,35 +28,25 @@ MaBeee.prototype = {
     };
 
     ext._getStatus = function() {
-        return {status: 2, msg: 'Ready'};
+        if (mabeee.getName() === "_default") {
+            return {
+                status: 1,
+                msg: '未接続'
+            };
+        } else {
+            return {
+                status: 2,
+                msg: mabeee.getName() + 'に接続しています。'
+            };
+        }
     };
 
     ext.setMaBeeeOn = function() {
-        for (var i = 0; i < mabeees.length; i++) {
-            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
-        }
+        requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=100');
     };
 
     ext.setMaBeeeOff = function() {
-        for (var i = 0; i < mabeees.length; i++) {
-            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
-        }
-    };
-
-    ext.setSelectedMaBeeeOn = function(id) {
-        for (var i = 0; i < mabeees.length; i++) {
-            if (mabeees[i].getId() == id) {
-                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
-            }
-        }
-    };
-
-    ext.setSelectedMaBeeeOff = function(name) {
-        for (var i = 0; i < mabeee.length; i++) {
-            if (mabeees[i].getId() == id) {
-                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
-            }
-        }
+        requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=0');
     };
 
     ext.setMaBeeePower = function(power) {
@@ -63,26 +60,21 @@ MaBeee.prototype = {
 
     ext.setMaBeeeOnAfterWaiting = function(wait, callback) {
         setTimeout(function() {
-            for (var i = 0; i < mabeees.length; i++) {
-                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
-                callback();
-            }
+            requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=100');
+            callback();
         }, wait * 1000);
     };
 
     ext.setMaBeeeOffAfterWaiting = function(wait, callback) {
         setTimeout(function() {
-            for (var i = 0; i < mabeees.length; i++) {
-                requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=0');
-                callback();
-            }
+            requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=0');
+            callback();
         }, wait * 1000);
     };
 
     ext.getRssi = function(callback) {
         requestMaBeeeAction('devices/' + mabeee.getId() + '/update?p=rssi');
-
-        getRssiById(id, function(rssi) {
+        getRssiById(mabeee.getId(), function(rssi) {
             callback(parseInt(rssi, 10) * (-1));
         });
     };
@@ -99,9 +91,10 @@ MaBeee.prototype = {
                     getIdByName(name, function(id) {
                         mabeee.setId(id);
                         requestMaBeeeAction('devices/' + mabeee.getId() + '/connect');
-                        setTimeout(function(){
+                        setTimeout(function() {
                             requestMaBeeeAction('scan/stop');
                             showMaBeeeStateInAlert(mabeee.getId());
+                            mabeee.setState("Connected");
                         }, 100);
                     });
                 }
@@ -109,42 +102,22 @@ MaBeee.prototype = {
         }, 10000);
     };
 
-    ext.disconnectMaBeee = function(){
+    ext.disconnectMaBeee = function() {
         requestMaBeeeAction('devices/' + mabeee.getId() + '/disconnect');
-    };
-
-    ext.connectAllMaBeee = function() {
-        requestMaBeeeAction('scan/start');
-        setTimeout(function() {
-            getAllMaBeees(function(mabeee_list) {
-                mabeees = mabeee_list;
-            });
-            for (var i = 0; i < mabeees.length; i++) {
-                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/connect');
-            }
-            setTimeout(function() {
-                requestMaBeeeAction('scan/stop');
-            });
-        }, 10000);
+        mabeee.setState("Disconnected");
     };
 
     var descriptor = {
         blocks: [
             [' ', 'MaBeeeをオンにする', 'setMaBeeeOn'],
             [' ', 'MaBeeeをオフにする', 'setMaBeeeOff'],
-            [' ', '%m.mabeees のMaBeeeをオンにする', 'setSelectedMaBeeeOn'],
-            [' ', '%m.mabeees のMaBeeeをオフにする', 'setSelectedMaBeeeOff'],
             [' ', 'MaBeeeの出力を %s にする', 'setMaBeeePower', 50],
             ['w', '%s 後にMaBeeeをオンにする', 'setMaBeeeOnAfterWaiting', 3],
             ['w', '%s 後にMaBeeeをオフにする', 'setMaBeeeOffAfterWaiting', 3],
             ['R', 'でんぱのつよさ', 'getRssi'],
             [' ', 'MaBeeeとせつぞくする', 'connectMaBeee'],
             [' ', 'MaBeeeのせつぞくをやめる', 'disconnectMaBeee'],
-        ],
-        menus: {
-            mabeees: ['MaBeee01', 'MaBeee02']
-        },
-        url: 'https://github.com/itome/scratchX_mabeee'
+        ]
     };
 
     ScratchExtensions.register('MaBeee Extension', descriptor, ext);
@@ -154,141 +127,94 @@ function getXHR() {
     var request;
     try {
         request = new XMLHttpRequest();
-    } catch(e) {
+    } catch (e) {
         try {
             request = new ActiveXObject('Msxml2.XMLHTTP');
-        } catch(e) {
+        } catch (e) {
             request = new ActiveXObject('Microsoft.XMLHTTP');
         }
     }
     return request;
 }
 
-//pathを渡してMaBeeeにHTTP GETするメソッドです。
-function requestMaBeeeAction(path) {
+function requestHttpGet(path, callback) {
     var request = getXHR();
     request.onreadystatechange = function() {
         if (request.readyState == 4) {
             if (request.status == 200) {
-
+                var json = eval('(' + request.responseText + ')');
+                callback(json);
             } else {
-                alert(request.responseText);
+                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
             }
-        } else {
-
         }
     };
     request.open('GET', 'http://localhost:11111/' + path, true);
     request.send(null);
-    setTimeout(function(){}, 100);
+    setTimeout(function() {}, 100);
 }
 
-function showMaBeeeStateInAlert(id) {
-    var request = getXHR();
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 200) {
-                var json = eval('(' + request.responseText + ')');
-                if (json.name == null) {
-                    alert(request.responseText);
-                } else {
-                    alert(json.name + 'に接続しました。');
-                }
-            } else {
-                alert("MaBeeeとの接続中にエラーが発生しました");
-            }
-        } else {
+//pathを渡してMaBeeeにHTTP GETするメソッドです。
+function requestMaBeeeAction(path) {
+    requestHttpGet(path, function(json) {});
+}
 
+//渡したidのMaBeeeの接続状況を返します。
+function showMaBeeeStateInAlert(id) {
+    requestHttpGet('devices/' + id, function(json) {
+        if (json.name == null) {
+            alert('接続に失敗しました。');
+        } else {
+            alert(json.name + 'に接続しました。');
         }
-    };
-    request.open('GET', 'http://localhost:11111/devices/' + id, true);
-    request.send(null);
-    setTimeout(function(){}, 100);
+    });
 };
 
 //Idから電波強度を取得します。数値はマイナス値で返されます。
 function getRssiById(id, callback) {
-    var request = getXHR();
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 200) {
-                var json = eval('(' + request.responseText + ')');
-                callback(json.rssi);
-            } else {
-                alert("電波強度の取得中にエラーが発生しました。");
-            }
-        } else {
-
-        }
-    };
-    request.open('GET', 'http://localhost:11111/devices/' + id, true);
-    request.send(null);
-    setTimeout(function(){}, 100);
+    requestHttpGet('devices/' + id, function(json) {
+        callback(json.rssi);
+    });
 }
 
 function getIdByName(name, callback) {
-    var request = getXHR();
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 200) {
-                var json = eval('(' + request.responseText + ')');
-                for (var i = 0; i < json.devices.length; i++) {
-                    if (json.devices[i].name === name) {
-                        callback(json.devices[i].id);
-                    }
-                }
-            } else {
-                alert(request.responseText);
+    requestHttpGet('devices/', function(json) {
+        for (var i = 0; i < json.devices.length; i++) {
+            if (json.devices[i].name === name) {
+                callback(json.devices[i].id);
             }
-        } else {
-
         }
-    };
-    request.open('GET', 'http://localhost:11111/devices/', true);
-    request.send(null);
-    setTimeout(function(){}, 100);
+    });
 }
 
 function getDevicesName(callback) {
-    var request = getXHR();
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 200) {
-                var json = eval('(' + request.responseText + ')');
-                var device_names = "";
-                for (var i = 0; i < json.devices.length; i++) {
-                    device_names += "- " + json.devices[i].name + "\n";
-                }
-                callback(device_names);
-            } else {
-                alert(request.responseText);
-            }
-        } else {
-
+    requestHttpGet('devices/', function(json) {
+        var device_names = "";
+        for (var i = 0; i < json.devices.length; i++) {
+            device_names += '- ' + json.devices[i].name + '\n';
         }
-    };
-    request.open('GET', 'http://localhost:11111/devices/', true);
-    request.send(null);
-    setTimeout(function(){}, 100);
+        callback(device_names);
+    });
 }
 
 //周囲のMaBeeeをスキャンしてMaBeeeの配列を取得
 function getAllMaBeees(callback) {
     var mabeees = [];
-    var request = getXHR();
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 200) {
-                var json = eval('(' + request.responseText + ')');
-                for (var i = 0; i < json.devices.length; i++) {
-                    var mabeee = new MaBeee(json.devices[i].id, json.devices[i].name);
-                    mabeees.push(mabeee);
-                    callback(mabeees);
-                }
+    requestHttpGet('devices/', function(json) {
+        for (var i = 0; i < json.devices.length; i++) {
+            var mabeee = new MaBeee(json.devices[i].id, json.devices[i].name);
+            mabeees.push(mabeee);
+            callback(mabeees);
+        }
+    });
+}
+
+function checkIfMaBeeeIsConnected(id, callback) {
+    requestHttpGet('devices/', function(json) {
+        for (var i = 0; i < json.devices.length; i++) {
+            if (json.devices[i].id == id) {
+                callback(true);
             }
         }
-    };
-    request.open('GET', 'http://localhost:11111/devices', true);
-    request.send(null);
-    setTimeout(function(){}, 100);
+    });
 }
