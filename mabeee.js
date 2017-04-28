@@ -139,7 +139,7 @@ function requestHttpGet(path, callback) {
                 var json = eval('(' + request.responseText + ')');
                 callback(json);
             } else {
-                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
+//                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
             }
         }
     };
