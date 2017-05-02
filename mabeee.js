@@ -93,7 +93,8 @@ MaBeee.prototype = {
                     });
                 }
             });
-        }, 10000);
+//小山        }, 10000);
+        }, 1000);
     };
 
     ext.disconnectMaBeee = function() {
@@ -139,7 +140,7 @@ function requestHttpGet(path, callback) {
                 var json = eval('(' + request.responseText + ')');
                 callback(json);
             } else {
-//                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
+//小山                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
             }
         }
     };
