@@ -1,6 +1,7 @@
-var MaBeee = function(id, name) {
+var MaBeee = function(id, name, isConnected) {
     this.id = id;
     this.name = name;
+    this.isConnected = isConnected;
 };
 MaBeee.prototype = {
     setId: function(id) {
@@ -9,44 +10,71 @@ MaBeee.prototype = {
     setName: function(name) {
         this.name = name;
     },
+    setIsConnected: function(isConnected) {
+        this.isConnected = isConnected;
+    },
     getId: function() {
         return this.id;
     },
     getName: function() {
         return this.name;
+    },
+    getIsConnected: function() {
+        return this.isConnected;
     }
 };
 
 
 (function(ext) {
 
-    var mabeee = new MaBeee(1, "_default");
+    var mabeees = [];
 
     ext._shutdown = function() {
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/disconnect');
+        for (var i = 0; i < mabeees.length; i++) {
+            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/disconnect');
+        }
         requestMaBeeeAction('scan/stop');
     };
 
     ext._getStatus = function() {
-        if (mabeee.getName() === "_default") {
+        var isMaBeeeConnected = false;
+        var mabeee_names = "";
+
+        for (var i = 0; i < mabeees.length; i++) {
+            if (mabeees[i].getIsConnected() == true) {
+                mabeee_names += mabeees[i].getName() + " ";
+                isMaBeeeConnected = true;
+            };
+        }
+
+        if (mabeees.length == 0) {
+            return {
+                status: 0,
+                msg: '周囲のMaBeeeをスキャンしてください。'
+            };
+        } else if (!isMaBeeeConnected) {
             return {
                 status: 1,
-                msg: '未接続'
+                msg: '接続待機中のMaBeeeがあります。'
             };
         } else {
             return {
                 status: 2,
-                msg: mabeee.getName() + 'に接続しています。'
+                msg: mabeee_names + 'に接続しました。'
             };
         }
     };
 
     ext.setMaBeeeOn = function() {
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=100');
+        for (var i = 0; i < mabeees.length; i++) {
+            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
+        }
     };
 
     ext.setMaBeeeOff = function() {
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=0');
+        for (var i = 0; i < mabeees.length; i++) {
+            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
+        }
     };
 
     ext.setMaBeeePower = function(power) {
@@ -55,76 +83,158 @@ MaBeee.prototype = {
         } else if (power < 0) {
             power = 0;
         }
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=' + power);
+        for (var i = 0; i < mabeees.length; i++) {
+            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=' + power);
+        }
     };
 
     ext.setMaBeeeOnAfterWaiting = function(wait, callback) {
         setTimeout(function() {
-            requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=100');
+            for (var i = 0; i < mabeees.length; i++) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
+            }
             callback();
         }, wait * 1000);
     };
 
     ext.setMaBeeeOffAfterWaiting = function(wait, callback) {
         setTimeout(function() {
-            requestMaBeeeAction('devices/' + mabeee.getId() + '/set?pwm_duty=0');
+            for (var i = 0; i < mabeees.length; i++) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
+            }
             callback();
         }, wait * 1000);
     };
 
-    ext.getRssi = function(callback) {
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/update?p=rssi');
-        getRssiById(mabeee.getId(), function(rssi) {
-            callback(parseInt(rssi, 10) * (-1));
-        });
+    ext.setSelectedMaBeeeOn = function(name) {
+        for (var i = 0; i < mabeees.length; i++) {
+            if (mabeees[i].getName() === name) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
+            }
+        }
     };
 
-    ext.connectMaBeee = function() {
-        requestMaBeeeAction('scan/start');
-        var name = "";
-        setTimeout(function() {
-            getDevicesName(function(names) {
-                if (names == "") {
-                    alert("MaBeeeが見つかりませんでした。");
-                } else {
-                    name = prompt("以下のMaBeeeが見つかりました。接続したいMaBeeeの名前を入力してください。\n" + names);
-                    getIdByName(name, function(id) {
-                        mabeee.setId(id);
-                        requestMaBeeeAction('devices/' + mabeee.getId() + '/connect');
-                        setTimeout(function() {
-                            requestMaBeeeAction('scan/stop');
-                            showMaBeeeStateInAlert(mabeee.getId());
-                            mabeee.setState("Connected");
-                        }, 100);
-                    });
-                }
-            });
-        }, 10000);
+    ext.setSelectedMaBeeeOff = function(name) {
+        for (var i = 0; i < mabeees.length; i++) {
+            if (mabeees[i].getName() === name) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
+            }
+        }
     };
+
+    ext.setSelectedMaBeeePower = function(name, power) {
+        if (power > 100) {
+            power = 100;
+        } else if (power < 0) {
+            power = 0;
+        }
+        for (var i = 0; i < mabeees.length; i++) {
+            if (mabeees[i].getName() === name) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=' + power);
+            }
+        }
+    };
+
+    ext.getRssi = function(name, callback) {
+        for(var i = 0; i < mabeees.length; i++) {
+            if (mabeees[i].getName() === name) {
+                requestMaBeeeAction('devices/' + mabeees[i].getId() + '/update?p=rssi');
+                getRssiById(mabeees[i].getId(), function(rssi) {
+                    callback(parseInt(rssi, 10) * (-1));
+                });
+            }
+        }
+    };
+
+    ext.setSelectedMaBeeeOnAfterWaiting = function(wait, name, callback) {
+        setTimeout(function() {
+            for (var i = 0; i < mabeees.length; i++) {
+                if (mabeees[i].getName() === name) {
+                    requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=100');
+                }
+            }
+            callback();
+        }, wait * 1000);
+    };
+
+    ext.setSelectedMaBeeeOffAfterWaiting = function(wait, name, callback) {
+        setTimeout(function() {
+            for (var i = 0; i < mabeees.length; i++) {
+                if (mabeees[i].getName() === name) {
+                    requestMaBeeeAction('devices/' + mabeees[i].getId() + '/set?pwm_duty=0');
+                }
+            }
+            callback();
+        }, wait * 1000);
+    };
+
+    ext.scanAllMaBeees = function() {
+        requestMaBeeeAction('scan/start');
+        setTimeout(function() {
+            getAllMaBeees(function(mabeee_list) {
+                mabeees = mabeee_list;
+                requestMaBeeeAction('scan/stop');
+
+                descriptor.menus.mabeees = [];
+                for (var i = 0; i < mabeees.length; i++) {
+                    descriptor.menus.mabeees.push(mabeees[i].getName());
+                }
+                ScratchExtensions.unregister('MaBeee Extension');
+                ScratchExtensions.register('MaBeee Extension', descriptor, ext);
+            });
+        }, 5000);
+    };
+
+    ext.connectMaBeee = function(name) {
+        requestMaBeeeAction('scan/start');
+        setTimeout(function() {
+            for (var i = 0; i < mabeees.length; i++) {
+                if (mabeees[i].getName() === name) {
+                    requestMaBeeeAction('devices/' + mabeees[i].getId() + '/connect');
+                    showMaBeeeStateInAlert(mabeees[i].getId());
+                    mabeees[i].setIsConnected(true);
+                    setTimeout(function() {
+                        requestMaBeeeAction('scan/stop');
+                    }, 100);
+                }
+            }
+        }, 5000);
+    };
+
 
     ext.disconnectMaBeee = function() {
-        requestMaBeeeAction('devices/' + mabeee.getId() + '/disconnect');
-        mabeee.setState("Disconnected");
+        for (var i = 0; i < mabeees.length; i++) {
+            requestMaBeeeAction('devices/' + mabeees[i].getId() + '/disconnect');
+            mabeees[i].setIsConnected(false);
+        }
     };
 
     var descriptor = {
         blocks: [
+            [' ', '周囲のMaBeeeをスキャンする', 'scanAllMaBeees'],
+            [' ', '%m.mabeees とせつぞくする', 'connectMaBeee'],
             [' ', 'MaBeeeをオンにする', 'setMaBeeeOn'],
             [' ', 'MaBeeeをオフにする', 'setMaBeeeOff'],
             [' ', 'MaBeeeの出力を %s にする', 'setMaBeeePower', 50],
-            ['w', '%s 後にMaBeeeをオンにする', 'setMaBeeeOnAfterWaiting', 3],
-            ['w', '%s 後にMaBeeeをオフにする', 'setMaBeeeOffAfterWaiting', 3],
-            ['R', 'でんぱのつよさ', 'getRssi'],
-            [' ', 'MaBeeeとせつぞくする', 'connectMaBeee'],
+            ['w', '%s 秒後にMaBeeeをオンにする', 'setMaBeeeOnAfterWaiting', 3],
+            ['w', '%s 秒後にMaBeeeをオフにする', 'setMaBeeeOffAfterWaiting', 3],
+            [' ', '%m.mabeees をオンにする', 'setSelectedMaBeeeOn'],
+            [' ', '%m.mabeees をオフにする', 'setSelectedMaBeeeOff'],
+            [' ', '%m.mabeees の出力を %s にする', 'setSelectedMaBeeePower', '', 50],
+            ['R', '%m.mabeees のでんぱのつよさ', 'getRssi'],
+            ['w', '%s 秒後に %m.mabeees をオンにする', 'setSelectedMaBeeeOnAfterWaiting', 3, ''],
+            ['w', '%s 秒後に %m.mabeees をオフにする', 'setSelectedMaBeeeOffAfterWaiting', 3, ''],
             [' ', 'MaBeeeのせつぞくをやめる', 'disconnectMaBeee'],
-        ]
+        ],
+        menus: {
+            mabeees: []
+        }
     };
 
     ScratchExtensions.register('MaBeee Extension', descriptor, ext);
 })({});
 
 function getXHR() {
-    var request;
     try {
         request = new XMLHttpRequest();
     } catch (e) {
@@ -145,13 +255,12 @@ function requestHttpGet(path, callback) {
                 var json = eval('(' + request.responseText + ')');
                 callback(json);
             } else {
-                alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
+                // alert('通信に失敗しました。MaBeeeアプリやBluetoothがオンになっているか確認してください。');
             }
         }
     };
     request.open('GET', 'http://localhost:11111/' + path, true);
     request.send(null);
-    setTimeout(function() {}, 100);
 }
 
 //pathを渡してMaBeeeにHTTP GETするメソッドです。
@@ -193,7 +302,12 @@ function getDevicesName(callback) {
         for (var i = 0; i < json.devices.length; i++) {
             device_names += '- ' + json.devices[i].name + '\n';
         }
-        callback(device_names);
+
+        if (device_names === "") {
+            alert("MaBeeeが見つかりませんでした。");
+        } else {
+            callback(device_names);
+        }
     });
 }
 
@@ -202,19 +316,9 @@ function getAllMaBeees(callback) {
     var mabeees = [];
     requestHttpGet('devices/', function(json) {
         for (var i = 0; i < json.devices.length; i++) {
-            var mabeee = new MaBeee(json.devices[i].id, json.devices[i].name);
+            var mabeee = new MaBeee(json.devices[i].id, json.devices[i].name, false);
             mabeees.push(mabeee);
-            callback(mabeees);
         }
-    });
-}
-
-function checkIfMaBeeeIsConnected(id, callback) {
-    requestHttpGet('devices/', function(json) {
-        for (var i = 0; i < json.devices.length; i++) {
-            if (json.devices[i].id == id) {
-                callback(true);
-            }
-        }
+        callback(mabeees);
     });
 }
